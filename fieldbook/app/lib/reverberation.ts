@@ -224,6 +224,30 @@ function degradeConfidence(score: number | undefined): number | undefined {
 }
 
 /**
+ * Recompute both confidence fields when upstream evidence changes.
+ *
+ * A human override records a considered judgement about the evidence as it
+ * stood when the override was set. Once that evidence moves, the judgement is
+ * stale — and because display resolves as `humanConfidenceOverride ??
+ * confidenceScore`, leaving the override in place would keep showing the old
+ * hand-set number indefinitely while the evidence beneath it had shifted,
+ * masking the degradation entirely.
+ *
+ * So the override is cleared and the degraded score becomes visible again. The
+ * item is simultaneously marked `recalibrating` with a `lastDiff`, so the human
+ * can review what changed and re-assert an override if they still stand by it.
+ */
+function decayConfidence(item: {
+  confidenceScore?: number;
+  humanConfidenceOverride?: number | null;
+}): { confidenceScore?: number; humanConfidenceOverride: number | null } {
+  return {
+    confidenceScore: degradeConfidence(item.confidenceScore),
+    humanConfidenceOverride: null,
+  };
+}
+
+/**
  * Propagate changes from a Source to all dependent Syntheses and Artifacts.
  *
  * Content-aware: when prevSourceContent is provided, computes a real
@@ -322,7 +346,7 @@ export function propagateFromSource(
           lastRenderedAt: now,
           recalcStatus: "recalibrating",
           lastDiff,
-          confidenceScore: degradeConfidence(synthesis.confidenceScore),
+          ...decayConfidence(synthesis),
         };
         updatedSynthesisIds.push(synthesis.id);
         return;
@@ -335,7 +359,7 @@ export function propagateFromSource(
       recalcStatus: "recalibrating",
       lastRenderedAt: now,
       lastDiff,
-      confidenceScore: degradeConfidence(synthesis.confidenceScore),
+      ...decayConfidence(synthesis),
     };
     updatedSynthesisIds.push(synthesis.id);
   });
@@ -377,7 +401,7 @@ export function propagateFromSource(
           lastRenderedAt: now,
           recalcStatus: "recalibrating",
           lastDiff,
-          confidenceScore: degradeConfidence(artifact.confidenceScore),
+          ...decayConfidence(artifact),
         };
         updatedArtifactIds.push(artifact.id);
         return;
@@ -389,7 +413,7 @@ export function propagateFromSource(
       recalcStatus: "recalibrating",
       lastRenderedAt: now,
       lastDiff,
-      confidenceScore: degradeConfidence(artifact.confidenceScore),
+      ...decayConfidence(artifact),
     };
     updatedArtifactIds.push(artifact.id);
   });

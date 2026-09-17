@@ -9,6 +9,7 @@
     "email",
     "slack_thread",
     "data_metric",
+    "signal",
     "whiteboard"
   ],
   "synthesisTypes": [
